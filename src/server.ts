@@ -17,6 +17,9 @@ import debugRoutes from './routes/debug';
 const app = express();
 const server = createServer(app);
 
+// ✅ Fix: Trust proxy for Railway/Render/Heroku
+app.set('trust proxy', 1);
+
 // Initialize Socket.IO service
 const socketService = new SocketService(server);
 
@@ -86,11 +89,11 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Global error handler:', err);
-  
+
   res.status(err.status || 500).json({
     success: false,
-    error: config.server.env === 'production' 
-      ? 'Internal server error' 
+    error: config.server.env === 'production'
+      ? 'Internal server error'
       : err.message || 'Something went wrong'
   });
 });
@@ -98,10 +101,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Graceful shutdown handler
 const gracefulShutdown = async (signal: string) => {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
-  
+
   server.close(async () => {
     console.log('HTTP server closed');
-    
+
     try {
       await closeConnection();
       console.log('Database connection closed');
@@ -111,7 +114,7 @@ const gracefulShutdown = async (signal: string) => {
       process.exit(1);
     }
   });
-  
+
   // Force close after 30 seconds
   setTimeout(() => {
     console.error('Could not close connections in time, forcefully shutting down');
