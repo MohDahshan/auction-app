@@ -6,10 +6,16 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '3001', 10),
     env: process.env.NODE_ENV || 'development',
-    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+    frontendUrl:
+      process.env.FRONTEND_URL ||
+      (process.env.NODE_ENV === 'production'
+        ? 'https://auction-app-full.vercel.app'
+        : 'http://localhost:5173'),
   },
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/auction_app',
+    url:
+      process.env.DATABASE_URL ||
+      'postgresql://postgres:password@localhost:5432/auction_app',
   },
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -42,17 +48,20 @@ export const config = {
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
   },
   socket: {
-    corsOrigin: process.env.SOCKET_CORS_ORIGIN || 'http://localhost:5173',
+    corsOrigin:
+      process.env.SOCKET_CORS_ORIGIN ||
+      (process.env.NODE_ENV === 'production'
+        ? 'https://auction-app-full.vercel.app'
+        : 'http://localhost:5173'),
   },
 };
 
 // Validate required environment variables
-const requiredEnvVars = [
-  'JWT_SECRET',
-  'JWT_REFRESH_SECRET',
-];
+const requiredEnvVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
 
-const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+const missingEnvVars = requiredEnvVars.filter(
+  (envVar) => !process.env[envVar],
+);
 
 if (missingEnvVars.length > 0 && config.server.env === 'production') {
   console.error('❌ Missing required environment variables:', missingEnvVars);
