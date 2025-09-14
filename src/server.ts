@@ -39,7 +39,9 @@ app.use(helmet({
 app.use(cors({
   origin: [
     config.server.frontendUrl,                     // اللي جاي من ملف config (ممكن يفضل localhost)
-    "https://auction-app-full.vercel.app"          // رابط الفرونت اند اللي شغال لايف
+    "https://auction-app-full.vercel.app",         // رابط الفرونت اند اللي شغال لايف
+    "http://localhost:5173",                       // للداشبورد المحلي
+    "http://localhost:5174"                        // للداشبورد المحلي (بورت بديل)
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
