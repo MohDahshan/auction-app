@@ -73,14 +73,14 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: transaction
     });
 
   } catch (error) {
     console.error('Error fetching transaction:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch transaction'
     });
