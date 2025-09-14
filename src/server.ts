@@ -13,6 +13,8 @@ import auctionRoutes from './routes/auctions';
 import paymentRoutes from './routes/payments';
 import productRoutes from './routes/products';
 import debugRoutes from './routes/debug';
+import userRoutes from './routes/users';
+import transactionRoutes from './routes/transactions';
 
 const app = express();
 const server = createServer(app);
@@ -80,6 +82,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/transactions', transactionRoutes);
 app.use('/api/debug', debugRoutes);
 
 // 404 handler
