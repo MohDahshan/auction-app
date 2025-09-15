@@ -563,6 +563,228 @@ router.post('/:id/bid', authenticateToken, bidValidation, async (req: AuthReques
   }
 });
 
+// Update auction
+router.put('/:id', authenticateToken, createAuctionValidation, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    const {
+      product_id,
+      title,
+      description,
+      entry_fee,
+      min_wallet,
+      starting_bid,
+      start_time,
+      end_time
+    }: CreateAuctionRequest = req.body;
+
+    // Check if auction exists
+    const existingAuction = await db('auctions').where({ id }).first();
+    if (!existingAuction) {
+      res.status(404).json({
+        success: false,
+        error: 'Auction not found'
+      });
+      return;
+    }
+
+    // Don't allow editing live or ended auctions
+    if (existingAuction.status !== 'upcoming') {
+      res.status(400).json({
+        success: false,
+        error: 'Cannot edit auction that is live or has ended'
+      });
+      return;
+    }
+
+    // Validate dates
+    const startDate = new Date(start_time);
+    const endDate = new Date(end_time);
+    const now = new Date();
+
+    if (startDate <= now) {
+      res.status(400).json({
+        success: false,
+        error: 'Start time must be in the future'
+      });
+      return;
+    }
+
+    if (endDate <= startDate) {
+      res.status(400).json({
+        success: false,
+        error: 'End time must be after start time'
+      });
+      return;
+    }
+
+    // Check if product exists
+    const product = await db('products')
+      .where({ id: product_id, is_active: true })
+      .first();
+
+    if (!product) {
+      res.status(404).json({
+        success: false,
+        error: 'Product not found or inactive'
+      });
+      return;
+    }
+
+    // Update auction
+    const [updatedAuction] = await db('auctions')
+      .where({ id })
+      .update({
+        product_id,
+        title,
+        description,
+        entry_fee,
+        min_wallet,
+        starting_bid,
+        start_time: startDate,
+        end_time: endDate,
+        updated_at: new Date()
+      })
+      .returning('*');
+
+    // Get auction with product details
+    const auctionWithProduct = await db('auctions')
+      .select([
+        'auctions.*',
+        'products.name as product_name',
+        'products.image_url as product_image',
+        'products.market_price',
+        'products.category',
+        'products.brand'
+      ])
+      .leftJoin('products', 'auctions.product_id', 'products.id')
+      .where('auctions.id', id)
+      .first();
+
+    res.json({
+      success: true,
+      data: {
+        ...auctionWithProduct,
+        product: {
+          name: auctionWithProduct.product_name,
+          image_url: auctionWithProduct.product_image,
+          market_price: auctionWithProduct.market_price,
+          category: auctionWithProduct.category,
+          brand: auctionWithProduct.brand
+        }
+      },
+      message: 'Auction updated successfully'
+    });
+  } catch (error) {
+    console.error('Update auction error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Delete auction
+router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Check if auction exists
+    const auction = await db('auctions').where({ id }).first();
+    if (!auction) {
+      res.status(404).json({
+        success: false,
+        error: 'Auction not found'
+      });
+      return;
+    }
+
+    // Don't allow deleting live auctions
+    if (auction.status === 'live') {
+      res.status(400).json({
+        success: false,
+        error: 'Cannot delete live auction'
+      });
+      return;
+    }
+
+    // Start transaction to handle related data
+    await db.transaction(async (trx) => {
+      // If auction has participants, refund entry fees
+      if (auction.total_participants > 0) {
+        const participants = await trx('bids')
+          .select('user_id')
+          .where('auction_id', id)
+          .groupBy('user_id');
+
+        for (const participant of participants) {
+          // Refund entry fee
+          await trx('users')
+            .where({ id: participant.user_id })
+            .increment('wallet_balance', auction.entry_fee);
+
+          // Create refund transaction
+          await trx('transactions').insert({
+            user_id: participant.user_id,
+            auction_id: id,
+            type: 'refund',
+            amount: auction.entry_fee,
+            description: `Refund for cancelled auction: ${auction.title}`,
+            status: 'completed'
+          });
+        }
+
+        // Refund any active bids
+        const activeBids = await trx('bids')
+          .where({ auction_id: id })
+          .where('amount', '>', 0);
+
+        for (const bid of activeBids) {
+          await trx('users')
+            .where({ id: bid.user_id })
+            .increment('wallet_balance', bid.amount);
+
+          await trx('transactions').insert({
+            user_id: bid.user_id,
+            auction_id: id,
+            type: 'refund',
+            amount: bid.amount,
+            description: `Bid refund for cancelled auction: ${auction.title}`,
+            status: 'completed'
+          });
+        }
+      }
+
+      // Delete related bids
+      await trx('bids').where('auction_id', id).del();
+
+      // Delete the auction
+      await trx('auctions').where({ id }).del();
+    });
+
+    res.json({
+      success: true,
+      message: 'Auction deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete auction error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Get auction bids
 router.get('/:id/bids', async (req: Request, res: Response): Promise<void> => {
   try {
