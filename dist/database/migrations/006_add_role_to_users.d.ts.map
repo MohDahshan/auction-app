@@ -1,0 +1,1 @@
+{"version":3,"file":"006_add_role_to_users.d.ts","sourceRoot":"","sources":["../../../src/database/migrations/006_add_role_to_users.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAC;AAG5B,wBAAsB,EAAE,CAAC,IAAI,EAAE,IAAI,GAAG,OAAO,CAAC,IAAI,CAAC,CA6BlD;AAED,wBAAsB,IAAI,CAAC,IAAI,EAAE,IAAI,GAAG,OAAO,CAAC,IAAI,CAAC,CAQpD"}

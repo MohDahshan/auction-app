@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../config/database';
-import { auth } from '../middleware/auth';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
 // Get all banners (public endpoint)
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const banners = await db('banners')
       .select('*')
@@ -26,7 +26,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Get all banners for admin (including inactive)
-router.get('/admin', auth, async (req: Request, res: Response) => {
+router.get('/admin', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const banners = await db('banners')
       .select('*')
@@ -46,7 +46,7 @@ router.get('/admin', auth, async (req: Request, res: Response) => {
 });
 
 // Get single banner
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     
@@ -56,10 +56,11 @@ router.get('/:id', async (req: Request, res: Response) => {
       .first();
 
     if (!banner) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Banner not found'
       });
+      return;
     }
 
     res.json({
@@ -76,7 +77,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // Create new banner (admin only)
-router.post('/', auth, async (req: Request, res: Response) => {
+router.post('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       title,
@@ -93,10 +94,11 @@ router.post('/', auth, async (req: Request, res: Response) => {
 
     // Validation
     if (!title || !description || !image_url) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Title, description, and image_url are required'
       });
+      return;
     }
 
     // Get next order_index if not provided
@@ -135,7 +137,7 @@ router.post('/', auth, async (req: Request, res: Response) => {
 });
 
 // Update banner (admin only)
-router.put('/:id', auth, async (req: Request, res: Response) => {
+router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const {
@@ -154,10 +156,11 @@ router.put('/:id', auth, async (req: Request, res: Response) => {
     // Check if banner exists
     const existingBanner = await db('banners').where('id', id).first();
     if (!existingBanner) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Banner not found'
       });
+      return;
     }
 
     const updateData: any = {};
@@ -193,17 +196,18 @@ router.put('/:id', auth, async (req: Request, res: Response) => {
 });
 
 // Delete banner (admin only)
-router.delete('/:id', auth, async (req: Request, res: Response) => {
+router.delete('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
     // Check if banner exists
     const existingBanner = await db('banners').where('id', id).first();
     if (!existingBanner) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Banner not found'
       });
+      return;
     }
 
     await db('banners').where('id', id).del();
@@ -222,17 +226,18 @@ router.delete('/:id', auth, async (req: Request, res: Response) => {
 });
 
 // Toggle banner active status (admin only)
-router.patch('/:id/toggle', auth, async (req: Request, res: Response) => {
+router.patch('/:id/toggle', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
     // Check if banner exists
     const existingBanner = await db('banners').where('id', id).first();
     if (!existingBanner) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Banner not found'
       });
+      return;
     }
 
     const [banner] = await db('banners')
@@ -257,15 +262,16 @@ router.patch('/:id/toggle', auth, async (req: Request, res: Response) => {
 });
 
 // Reorder banners (admin only)
-router.post('/reorder', auth, async (req: Request, res: Response) => {
+router.post('/reorder', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { bannerIds } = req.body; // Array of banner IDs in new order
 
     if (!Array.isArray(bannerIds)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'bannerIds must be an array'
       });
+      return;
     }
 
     // Update order_index for each banner
