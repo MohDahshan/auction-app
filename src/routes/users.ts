@@ -108,4 +108,135 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Create new user
+router.post('/', async (req, res) => {
+  try {
+    const { email, name, phone, password } = req.body;
+
+    // Basic validation
+    if (!email || !name || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email, name, and password are required'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await db('users').where('email', email).first();
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+    }
+
+    // Create user (password should be hashed in real app)
+    const [newUser] = await db('users')
+      .insert({
+        email,
+        name,
+        phone,
+        password_hash: password, // In real app, hash this!
+        wallet_balance: 500
+      })
+      .returning([
+        'id',
+        'email',
+        'name',
+        'phone',
+        'wallet_balance',
+        'is_active',
+        'created_at'
+      ]);
+
+    return res.status(201).json({
+      success: true,
+      data: newUser
+    });
+
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create user'
+    });
+  }
+});
+
+// Update user
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, name, phone, wallet_balance, is_active } = req.body;
+
+    const updateData: any = {};
+    if (email !== undefined) updateData.email = email;
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (wallet_balance !== undefined) updateData.wallet_balance = wallet_balance;
+    if (is_active !== undefined) updateData.is_active = is_active;
+
+    const [updatedUser] = await db('users')
+      .where('id', id)
+      .update(updateData)
+      .returning([
+        'id',
+        'email',
+        'name',
+        'phone',
+        'wallet_balance',
+        'is_active',
+        'created_at',
+        'last_login_at'
+      ]);
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update user'
+    });
+  }
+});
+
+// Delete user
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedCount = await db('users').where('id', id).del();
+
+    if (deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to delete user'
+    });
+  }
+});
+
 export default router;
