@@ -17,15 +17,13 @@ router.get('/', async (req, res) => {
     // Add search functionality
     if (search) {
       query = query.where(function() {
-        this.where('username', 'ilike', `%${search}%`)
-            .orWhere('email', 'ilike', `%${search}%`)
-            .orWhere('full_name', 'ilike', `%${search}%`);
+        this.where('name', 'ilike', `%${search}%`)
+            .orWhere('email', 'ilike', `%${search}%`);
       });
       
       countQuery = countQuery.where(function() {
-        this.where('username', 'ilike', `%${search}%`)
-            .orWhere('email', 'ilike', `%${search}%`)
-            .orWhere('full_name', 'ilike', `%${search}%`);
+        this.where('name', 'ilike', `%${search}%`)
+            .orWhere('email', 'ilike', `%${search}%`);
       });
     }
 
@@ -38,13 +36,13 @@ router.get('/', async (req, res) => {
     const users = await query
       .select([
         'id',
-        'username',
         'email',
-        'full_name',
+        'name',
+        'phone',
         'wallet_balance',
         'is_active',
         'created_at',
-        'last_login'
+        'last_login_at'
       ])
       .orderBy('created_at', 'desc')
       .limit(limit)
@@ -78,13 +76,13 @@ router.get('/:id', async (req, res) => {
     const user = await db('users')
       .select([
         'id',
-        'username',
         'email',
-        'full_name',
+        'name',
+        'phone',
         'wallet_balance',
         'is_active',
         'created_at',
-        'last_login'
+        'last_login_at'
       ])
       .where('id', id)
       .first();
