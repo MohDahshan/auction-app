@@ -390,6 +390,15 @@ router.post('/:id/join', authenticateToken, async (req: AuthRequest, res: Respon
         .where({ id: userId })
         .decrement('wallet_balance', auction.entry_fee);
 
+      // Create bid record with 0 amount (indicates participation)
+      await trx('bids').insert({
+        auction_id: id,
+        user_id: userId,
+        amount: 0,
+        bid_time: new Date(),
+        is_winning: false
+      });
+
       // Create transaction record
       await trx('transactions').insert({
         user_id: userId,
