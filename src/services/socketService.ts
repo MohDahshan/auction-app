@@ -37,6 +37,17 @@ export class SocketService {
           return next(new Error('Authentication token required'));
         }
 
+        // Allow guest connections for viewing auctions
+        if (token === 'guest') {
+          socket.user = {
+            id: 'guest',
+            name: 'Guest User',
+            email: 'guest@example.com',
+            is_guest: true
+          };
+          return next();
+        }
+
         const decoded = jwt.verify(token, config.jwt.secret as string) as { userId: string };
         
         const user = await db('users')
@@ -105,6 +116,12 @@ export class SocketService {
         try {
           const { auctionId, amount } = data;
           const userId = socket.user.id;
+
+          // Check if user is guest
+          if (socket.user.is_guest) {
+            socket.emit('bid:error', { message: 'Please login to place bids' });
+            return;
+          }
 
           // Validate bid (similar to REST API logic)
           const auction = await db('auctions')
