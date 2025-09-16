@@ -3,6 +3,7 @@ import { body, query, validationResult } from 'express-validator';
 import { db } from '../config/database';
 import { AuthRequest, authenticateToken, optionalAuth } from '../middleware/auth';
 import { Auction, AuctionFilters, BidRequest, CreateAuctionRequest } from '../types';
+import { socketService } from '../server';
 
 const router = Router();
 
@@ -220,18 +221,30 @@ router.post('/', authenticateToken, createAuctionValidation, async (req: AuthReq
       .where('auctions.id', auction.id)
       .first();
 
+    // Broadcast new auction to all connected clients
+    const newAuctionData = {
+      ...auctionWithProduct,
+      current_bid: auctionWithProduct.starting_bid,
+      product: {
+        name: auctionWithProduct.product_name,
+        image_url: auctionWithProduct.product_image,
+        market_price: auctionWithProduct.market_price,
+        category: auctionWithProduct.category,
+        brand: auctionWithProduct.brand
+      }
+    };
+
+    // Emit to all connected clients
+    if (socketService) {
+      socketService.getIO().emit('auction:created', {
+        auction: newAuctionData,
+        message: 'New auction created'
+      });
+    }
+
     res.status(201).json({
       success: true,
-      data: {
-        ...auctionWithProduct,
-        product: {
-          name: auctionWithProduct.product_name,
-          image_url: auctionWithProduct.product_image,
-          market_price: auctionWithProduct.market_price,
-          category: auctionWithProduct.category,
-          brand: auctionWithProduct.brand
-        }
-      },
+      data: newAuctionData,
       message: 'Auction created successfully'
     });
   } catch (error) {
@@ -671,18 +684,30 @@ router.put('/:id', authenticateToken, createAuctionValidation, async (req: AuthR
       .where('auctions.id', id)
       .first();
 
+    // Broadcast auction update to all connected clients
+    const updatedAuctionData = {
+      ...auctionWithProduct,
+      current_bid: auctionWithProduct.starting_bid,
+      product: {
+        name: auctionWithProduct.product_name,
+        image_url: auctionWithProduct.product_image,
+        market_price: auctionWithProduct.market_price,
+        category: auctionWithProduct.category,
+        brand: auctionWithProduct.brand
+      }
+    };
+
+    // Emit to all connected clients
+    if (socketService) {
+      socketService.getIO().emit('auction:updated', {
+        auction: updatedAuctionData,
+        message: 'Auction updated'
+      });
+    }
+
     res.json({
       success: true,
-      data: {
-        ...auctionWithProduct,
-        product: {
-          name: auctionWithProduct.product_name,
-          image_url: auctionWithProduct.product_image,
-          market_price: auctionWithProduct.market_price,
-          category: auctionWithProduct.category,
-          brand: auctionWithProduct.brand
-        }
-      },
+      data: updatedAuctionData,
       message: 'Auction updated successfully'
     });
   } catch (error) {
@@ -771,6 +796,14 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response)
       // Delete the auction
       await trx('auctions').where({ id }).del();
     });
+
+    // Broadcast auction deletion to all connected clients
+    if (socketService) {
+      socketService.getIO().emit('auction:deleted', {
+        auctionId: id,
+        message: 'Auction deleted'
+      });
+    }
 
     res.json({
       success: true,
