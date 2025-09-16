@@ -6,6 +6,7 @@ import { createServer } from 'http';
 import { config } from './config';
 import { testConnection, closeConnection } from './config/database';
 import { SocketService } from './services/socketService';
+import { AuctionScheduler } from './services/auctionScheduler';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -25,6 +26,9 @@ app.set('trust proxy', 1);
 
 // Initialize Socket.IO service
 const socketService = new SocketService(server);
+
+// Initialize Auction Scheduler
+const auctionScheduler = new AuctionScheduler(socketService);
 
 // Security middleware
 app.use(helmet({
@@ -112,6 +116,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 const gracefulShutdown = async (signal: string) => {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
 
+  // Stop auction scheduler
+  auctionScheduler.stop();
+
   server.close(async () => {
     console.log('HTTP server closed');
 
@@ -148,6 +155,9 @@ const startServer = async () => {
 
     // Start HTTP server
     server.listen(config.server.port, () => {
+      // Start auction scheduler after server is running
+      auctionScheduler.start();
+      
       console.log(`
 🚀 Auction API Server Started Successfully!
 
@@ -164,6 +174,7 @@ const startServer = async () => {
 
 ⚡ Real-time Features:
    • Socket.IO: Enabled for live bidding
+   • Auction Scheduler: Running (checks every 30 seconds)
    • CORS Origin: ${config.socket.corsOrigin}
 
 🛡️ Security:
