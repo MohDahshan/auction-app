@@ -119,21 +119,7 @@ export class AuctionScheduler {
         timeLeft: Math.floor((new Date(auction.end_time).getTime() - new Date().getTime()) / 1000)
       };
 
-      // Broadcast auction started event
-      const io = this.socketService.getIO();
-      io.emit('auction_started', {
-        auction: updatedAuction,
-        message: `Auction "${auction.title}" has started!`
-      });
-
-      // Broadcast auction status change
-      io.emit('auction_status_changed', {
-        auction: updatedAuction,
-        previousStatus: 'scheduled',
-        newStatus: 'live'
-      });
-
-      // Broadcast updated auctions lists
+      // Only broadcast auction list updates (no popup notifications)
       await this.broadcastAuctionListUpdates();
 
       console.log(`✅ Successfully started auction: ${auction.title}`);
@@ -184,30 +170,7 @@ export class AuctionScheduler {
         winner: winningBid?.user_name || null
       };
 
-      // Broadcast auction ended event
-      const io = this.socketService.getIO();
-      io.emit('auction_ended', {
-        auction: updatedAuction,
-        winner: winningBid,
-        message: winningBid 
-          ? `Auction "${auction.title}" won by ${winningBid.user_name}!`
-          : `Auction "${auction.title}" ended with no bids`
-      });
-
-      // Broadcast auction status change
-      io.emit('auction_status_changed', {
-        auction: updatedAuction,
-        previousStatus: 'live',
-        newStatus: 'ended'
-      });
-
-      // Broadcast to auction room
-      io.to(`auction:${auction.id}`).emit('auction:ended', {
-        auction: updatedAuction,
-        winner: winningBid
-      });
-
-      // Broadcast updated auctions lists
+      // Only broadcast auction list updates (no popup notifications)
       await this.broadcastAuctionListUpdates();
 
       console.log(`✅ Successfully ended auction: ${auction.title}. Winner: ${winningBid?.user_name || 'None'}`);
