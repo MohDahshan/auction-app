@@ -58,8 +58,7 @@ export class AuctionScheduler {
         ])
         .leftJoin('products', 'auctions.product_id', 'products.id')
         .where('auctions.status', 'upcoming')
-        .where('auctions.start_time', '<=', now)
-        .where('auctions.is_active', true);
+        .where('auctions.start_time', '<=', now);
 
       for (const auction of auctionsToStart) {
         await this.startAuction(auction);
@@ -85,8 +84,7 @@ export class AuctionScheduler {
         ])
         .leftJoin('products', 'auctions.product_id', 'products.id')
         .where('auctions.status', 'live')
-        .where('auctions.end_time', '<=', now)
-        .where('auctions.is_active', true);
+        .where('auctions.end_time', '<=', now);
 
       for (const auction of auctionsToEnd) {
         await this.endAuction(auction);
@@ -325,7 +323,6 @@ export class AuctionScheduler {
       ])
       .leftJoin('products', 'auctions.product_id', 'products.id')
       .where('auctions.status', status)
-      .where('auctions.is_active', true)
       .orderBy('auctions.created_at', 'desc')
       .limit(10);
   }
