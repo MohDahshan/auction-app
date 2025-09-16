@@ -57,7 +57,7 @@ export class AuctionScheduler {
           'products.category'
         ])
         .leftJoin('products', 'auctions.product_id', 'products.id')
-        .where('auctions.status', 'scheduled')
+        .where('auctions.status', 'upcoming')
         .where('auctions.start_time', '<=', now)
         .where('auctions.is_active', true);
 
@@ -289,7 +289,7 @@ export class AuctionScheduler {
       // Get updated auction lists
       const [liveAuctions, upcomingAuctions, endedAuctions] = await Promise.all([
         this.getAuctionsByStatus('live'),
-        this.getAuctionsByStatus('scheduled'),
+        this.getAuctionsByStatus('upcoming'),
         this.getAuctionsByStatus('ended')
       ]);
 
