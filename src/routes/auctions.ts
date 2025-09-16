@@ -30,6 +30,95 @@ const auctionFilters = [
   query('limit').optional().isInt({ min: 1, max: 100 })
 ];
 
+// Get all auctions grouped by status - MUST BE BEFORE /:id route
+router.get('/all', optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Get all auctions with product details
+    const allAuctions = await db('auctions')
+      .select([
+        'auctions.*',
+        'products.name as product_name',
+        'products.image_url as product_image',
+        'products.market_price',
+        'products.category',
+        'products.brand',
+        'users.name as winner_name'
+      ])
+      .leftJoin('products', 'auctions.product_id', 'products.id')
+      .leftJoin('users', 'auctions.winner_id', 'users.id')
+      .orderBy('auctions.created_at', 'desc');
+
+    // Get current highest bids for each auction
+    const auctionIds = allAuctions.map(auction => auction.id);
+    const highestBids = await db('bids')
+      .select('auction_id')
+      .max('amount as highest_bid')
+      .whereIn('auction_id', auctionIds)
+      .groupBy('auction_id');
+
+    const bidMap = highestBids.reduce((acc, bid) => {
+      acc[bid.auction_id] = bid.highest_bid;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Transform and group auctions
+    const transformedAuctions = allAuctions.map(auction => ({
+      id: auction.id,
+      title: auction.title,
+      image: auction.product_image || 'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg',
+      currentBid: bidMap[auction.id] || auction.starting_bid,
+      marketPrice: auction.market_price,
+      timeLeft: auction.status === 'live' ? Math.max(0, Math.floor((new Date(auction.end_time).getTime() - Date.now()) / 1000)) : 0,
+      bidders: auction.total_participants || 0,
+      entryFee: auction.entry_fee,
+      minWallet: auction.min_wallet,
+      description: auction.description || `${auction.title} - ${auction.status} auction`,
+      category: auction.category || 'General',
+      status: auction.status,
+      startTime: auction.start_time,
+      endTime: auction.end_time,
+      productName: auction.product_name,
+      finalBid: auction.status === 'ended' ? (bidMap[auction.id] || auction.starting_bid) : undefined,
+      winner: auction.winner_name,
+      savings: auction.status === 'ended' ? (auction.market_price - (bidMap[auction.id] || auction.starting_bid)) : undefined,
+      endedAgo: auction.status === 'ended' ? 'Recently ended' : undefined,
+      product: {
+        name: auction.product_name,
+        image_url: auction.product_image,
+        market_price: auction.market_price,
+        category: auction.category,
+        brand: auction.brand
+      }
+    }));
+
+    // Group auctions by status
+    const upcoming = transformedAuctions.filter(auction => auction.status === 'upcoming');
+    const live = transformedAuctions.filter(auction => auction.status === 'live');
+    const ended = transformedAuctions.filter(auction => auction.status === 'ended');
+    
+    // Featured auctions (high-value or popular ones)
+    const featured = transformedAuctions
+      .filter(auction => auction.marketPrice > 1000 || auction.bidders > 10)
+      .slice(0, 5);
+
+    res.json({
+      success: true,
+      data: {
+        upcoming,
+        live,
+        ended,
+        featured
+      }
+    });
+  } catch (error) {
+    console.error('Get all auctions error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Get all auctions with filters
 router.get('/', auctionFilters, optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -827,94 +916,6 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response)
   }
 });
 
-// Get all auctions grouped by status
-router.get('/all', optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    // Get all auctions with product details
-    const allAuctions = await db('auctions')
-      .select([
-        'auctions.*',
-        'products.name as product_name',
-        'products.image_url as product_image',
-        'products.market_price',
-        'products.category',
-        'products.brand',
-        'users.name as winner_name'
-      ])
-      .leftJoin('products', 'auctions.product_id', 'products.id')
-      .leftJoin('users', 'auctions.winner_id', 'users.id')
-      .orderBy('auctions.created_at', 'desc');
-
-    // Get current highest bids for each auction
-    const auctionIds = allAuctions.map(auction => auction.id);
-    const highestBids = await db('bids')
-      .select('auction_id')
-      .max('amount as highest_bid')
-      .whereIn('auction_id', auctionIds)
-      .groupBy('auction_id');
-
-    const bidMap = highestBids.reduce((acc, bid) => {
-      acc[bid.auction_id] = bid.highest_bid;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Transform and group auctions
-    const transformedAuctions = allAuctions.map(auction => ({
-      id: auction.id,
-      title: auction.title,
-      image: auction.product_image || 'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg',
-      currentBid: bidMap[auction.id] || auction.starting_bid,
-      marketPrice: auction.market_price,
-      timeLeft: auction.status === 'live' ? Math.max(0, Math.floor((new Date(auction.end_time).getTime() - Date.now()) / 1000)) : 0,
-      bidders: auction.total_participants || 0,
-      entryFee: auction.entry_fee,
-      minWallet: auction.min_wallet,
-      description: auction.description || `${auction.title} - ${auction.status} auction`,
-      category: auction.category || 'General',
-      status: auction.status,
-      startTime: auction.start_time,
-      endTime: auction.end_time,
-      productName: auction.product_name,
-      finalBid: auction.status === 'ended' ? (bidMap[auction.id] || auction.starting_bid) : undefined,
-      winner: auction.winner_name,
-      savings: auction.status === 'ended' ? (auction.market_price - (bidMap[auction.id] || auction.starting_bid)) : undefined,
-      endedAgo: auction.status === 'ended' ? 'Recently ended' : undefined,
-      product: {
-        name: auction.product_name,
-        image_url: auction.product_image,
-        market_price: auction.market_price,
-        category: auction.category,
-        brand: auction.brand
-      }
-    }));
-
-    // Group auctions by status
-    const upcoming = transformedAuctions.filter(auction => auction.status === 'upcoming');
-    const live = transformedAuctions.filter(auction => auction.status === 'live');
-    const ended = transformedAuctions.filter(auction => auction.status === 'ended');
-    
-    // Featured auctions (high-value or popular ones)
-    const featured = transformedAuctions
-      .filter(auction => auction.marketPrice > 1000 || auction.bidders > 10)
-      .slice(0, 5);
-
-    res.json({
-      success: true,
-      data: {
-        upcoming,
-        live,
-        ended,
-        featured
-      }
-    });
-  } catch (error) {
-    console.error('Get all auctions error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
-  }
-});
 
 // Get auction bids
 router.get('/:id/bids', async (req: Request, res: Response): Promise<void> => {
