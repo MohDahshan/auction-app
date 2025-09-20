@@ -114,9 +114,68 @@ router.post('/', async (req, res) => {
   // ... (unchanged)
 });
 
-// Update user
+/**
+ * Update user profile (name, email, phone)
+ * PATCH/PUT /api/users/:id
+ */
 router.put('/:id', async (req, res) => {
-  // ... (unchanged)
+  try {
+    const { id } = req.params;
+    const { email, name, phone } = req.body;
+
+    // Log بداية التحديث
+    console.log(`[USER UPDATE] id=${id} email=${email} name=${name} phone=${phone}`);
+
+    // فقط الأعمدة المسموحة
+    const updateData: any = {};
+    if (email !== undefined) updateData.email = email;
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
+      });
+    }
+
+    // تحديث المستخدم
+    const [updatedUser] = await db('users')
+      .where('id', id)
+      .update(updateData)
+      .returning([
+        'id',
+        'email',
+        'name',
+        'phone',
+        'wallet_balance',
+        'is_active',
+        'created_at',
+        'last_login_at'
+      ]);
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Log نهاية التحديث
+    console.log(`[USER UPDATE SUCCESS] id=${id}`);
+
+    return res.json({
+      success: true,
+      data: updatedUser
+    });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update user',
+      details: typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error)
+    });
+  }
 });
 
 // Delete user
