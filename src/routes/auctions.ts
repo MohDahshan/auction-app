@@ -917,6 +917,41 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response)
 });
 
 
+/**
+ * Get top bidders for an auction (top N by amount)
+ * GET /auctions/:id/top-bidders?limit=5
+ */
+router.get('/:id/top-bidders', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit as string, 10) || 5;
+
+    const topBidders = await db('bids')
+      .select([
+        'bids.user_id',
+        'users.name as user_name',
+        db.raw('MAX(bids.amount) as max_bid'),
+        db.raw('COUNT(bids.id) as total_bids')
+      ])
+      .leftJoin('users', 'bids.user_id', 'users.id')
+      .where('bids.auction_id', id)
+      .groupBy('bids.user_id', 'users.name')
+      .orderBy('max_bid', 'desc')
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: topBidders
+    });
+  } catch (error) {
+    console.error('Get top bidders error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Get auction bids
 router.get('/:id/bids', async (req: Request, res: Response): Promise<void> => {
   try {

@@ -1,4 +1,4 @@
-const knex = require('knex');
+ي const knex = require('knex');
 
 // استخدام الـ production database URL من Railway/Neon
 const knexConfig = {
