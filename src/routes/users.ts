@@ -23,20 +23,36 @@ router.get('/:id/purchases', async (req, res) => {
   try {
     const { id } = req.params;
     // جلب آخر 10 مزادات فاز بها المستخدم مع تفاصيل المنتج
-    const purchases = await db('auctions')
-      .where('winner_id', id)
-      .orderBy('end_time', 'desc')
-      .limit(10)
-      .leftJoin('products', 'auctions.product_id', 'products.id')
-      .select(
-        'auctions.id as auction_id',
-        'auctions.title as auction_title',
-        'auctions.final_bid',
-        'auctions.market_price',
-        'auctions.end_time',
-        'products.name as product_name',
-        'products.image_url as product_image'
-      );
+    let purchases: any[] = [];
+    try {
+      purchases = await db('auctions')
+        .where('winner_id', id)
+        .orderBy('end_time', 'desc')
+        .limit(10)
+        .leftJoin('products', 'auctions.product_id', 'products.id')
+        .select(
+          'auctions.id as auction_id',
+          'auctions.title as auction_title',
+          'auctions.final_bid',
+          'auctions.market_price',
+          'auctions.end_time',
+          db.raw('COALESCE(products.name, auctions.title) as product_name'),
+          db.raw('COALESCE(products.image_url, \'\') as product_image')
+        );
+    } catch (err) {
+      // fallback: جلب فقط من جدول auctions بدون join
+      purchases = await db('auctions')
+        .where('winner_id', id)
+        .orderBy('end_time', 'desc')
+        .limit(10)
+        .select(
+          'id as auction_id',
+          'title as auction_title',
+          'final_bid',
+          'market_price',
+          'end_time'
+        );
+    }
 
     // تجهيز البيانات للواجهة
     const result = purchases.map(p => ({
