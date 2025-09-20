@@ -24,6 +24,7 @@ router.get('/:id/purchases', async (req, res) => {
     const { id } = req.params;
     // جلب آخر 10 مزادات فاز بها المستخدم مع تفاصيل المنتج
     try {
+      // جلب الأعمدة الموجودة فقط (final_bid, end_time, title)
       const purchases = await db('auctions')
         .where('winner_id', id)
         .orderBy('end_time', 'desc')
@@ -32,7 +33,6 @@ router.get('/:id/purchases', async (req, res) => {
           'id as auction_id',
           'title as auction_title',
           'final_bid',
-          'market_price',
           'end_time'
         );
 
@@ -40,7 +40,7 @@ router.get('/:id/purchases', async (req, res) => {
         auctionId: p.auction_id,
         item: p.auction_title,
         date: p.end_time,
-        profit: p.market_price && p.final_bid ? `+SAR ${Number(p.market_price) - Number(p.final_bid) * 10}` : '',
+        profit: p.final_bid ? `Bid: SAR ${Number(p.final_bid) * 10}` : '',
         image: '', // لا يوجد صورة بدون join
       }));
 
