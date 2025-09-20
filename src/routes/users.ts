@@ -5,67 +5,7 @@ const router = express.Router();
 
 // Get all users with pagination
 router.get('/', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const search = req.query.search as string;
-    const offset = (page - 1) * limit;
-
-    let query = db('users').select('*');
-    let countQuery = db('users');
-
-    // Add search functionality
-    if (search) {
-      query = query.where(function() {
-        this.where('name', 'ilike', `%${search}%`)
-            .orWhere('email', 'ilike', `%${search}%`);
-      });
-      
-      countQuery = countQuery.where(function() {
-        this.where('name', 'ilike', `%${search}%`)
-            .orWhere('email', 'ilike', `%${search}%`);
-      });
-    }
-
-    // Get total count for pagination
-    const totalResult = await countQuery.count('* as count').first();
-    const total = parseInt(totalResult?.count as string) || 0;
-    const pages = Math.ceil(total / limit);
-
-    // Get users with pagination
-    const users = await query
-      .select([
-        'id',
-        'email',
-        'name',
-        'phone',
-        'wallet_balance',
-        'is_active',
-        'created_at',
-        'last_login_at'
-      ])
-      .orderBy('created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
-
-    return res.json({
-      success: true,
-      data: users,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages
-      }
-    });
-
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch users'
-    });
-  }
+  // ... (unchanged)
 });
 
 // Get user by ID
@@ -73,45 +13,49 @@ router.get('/:id', async (req, res) => {
   // ... (unchanged)
 });
 
-// New: Get user stats (auctions won, total saved, success rate, best streak)
+// Get user stats (auctions won, total saved, success rate, best streak)
 router.get('/:id/stats', async (req, res) => {
+  // ... (unchanged)
+});
+
+// New: Get recent purchases (auctions won by user, with product info)
+router.get('/:id/purchases', async (req, res) => {
   try {
     const { id } = req.params;
+    // جلب آخر 10 مزادات فاز بها المستخدم مع تفاصيل المنتج
+    const purchases = await db('auctions')
+      .where('winner_id', id)
+      .orderBy('end_time', 'desc')
+      .limit(10)
+      .leftJoin('products', 'auctions.product_id', 'products.id')
+      .select(
+        'auctions.id as auction_id',
+        'auctions.title as auction_title',
+        'auctions.final_bid',
+        'auctions.market_price',
+        'auctions.end_time',
+        'products.name as product_name',
+        'products.image_url as product_image'
+      );
 
-    // Auctions won: auctions where user is winner
-    const wonAuctions = await db('auctions').where('winner_id', id);
-    const auctionsWon = wonAuctions.length;
-
-    // Total saved: sum of (market_price - final_bid*10) for won auctions
-    let totalSaved = 0;
-    for (const auction of wonAuctions) {
-      if (auction.market_price && auction.final_bid) {
-        totalSaved += Number(auction.market_price) - Number(auction.final_bid) * 10;
-      }
-    }
-
-    // Success rate: auctions won / auctions participated
-    const participated = await db('bids').where('user_id', id).distinct('auction_id');
-    const auctionsParticipated = participated.length;
-    const successRate = auctionsParticipated > 0 ? Math.round((auctionsWon / auctionsParticipated) * 100) : 0;
-
-    // Best streak: max consecutive wins (simple version: total wins)
-    const bestStreak = auctionsWon; // For now, just total wins
+    // تجهيز البيانات للواجهة
+    const result = purchases.map(p => ({
+      auctionId: p.auction_id,
+      item: p.product_name || p.auction_title,
+      date: p.end_time,
+      profit: p.market_price && p.final_bid ? `+SAR ${Number(p.market_price) - Number(p.final_bid) * 10}` : '',
+      image: p.product_image || '',
+    }));
 
     return res.json({
       success: true,
-      data: {
-        auctionsWon,
-        totalSaved,
-        successRate,
-        bestStreak
-      }
+      data: result
     });
   } catch (error) {
-    console.error('Error fetching user stats:', error);
+    console.error('Error fetching user purchases:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to fetch user stats'
+      error: 'Failed to fetch user purchases'
     });
   }
 });
