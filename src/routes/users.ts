@@ -53,7 +53,7 @@ router.get('/:id/purchases', async (req, res) => {
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch user purchases',
-        details: error?.message || error
+        details: typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error)
       });
     }
   } catch (error) {
