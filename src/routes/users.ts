@@ -15,7 +15,51 @@ router.get('/:id', async (req, res) => {
 
 // Get user stats (auctions won, total saved, success rate, best streak)
 router.get('/:id/stats', async (req, res) => {
-  // ... (unchanged)
+  try {
+    const { id } = req.params;
+
+    // Auctions won: auctions where user is winner
+    const wonAuctions = await db('auctions').where('winner_id', id);
+    const auctionsWon = wonAuctions.length;
+
+    // Total saved: إذا لم يوجد market_price أو final_bid، اجعلها صفر
+    let totalSaved = 0;
+    for (const auction of wonAuctions) {
+      if ('market_price' in auction && 'final_bid' in auction && auction.market_price && auction.final_bid) {
+        totalSaved += Number(auction.market_price) - Number(auction.final_bid) * 10;
+      }
+    }
+
+    // Success rate: auctions won / auctions participated
+    let auctionsParticipated = 0;
+    try {
+      const participated = await db('bids').where('user_id', id).distinct('auction_id');
+      auctionsParticipated = participated.length;
+    } catch (e) {
+      auctionsParticipated = auctionsWon; // fallback
+    }
+    const successRate = auctionsParticipated > 0 ? Math.round((auctionsWon / auctionsParticipated) * 100) : 0;
+
+    // Best streak: max consecutive wins (simple version: total wins)
+    const bestStreak = auctionsWon; // For now, just total wins
+
+    return res.json({
+      success: true,
+      data: {
+        auctionsWon,
+        totalSaved,
+        successRate,
+        bestStreak
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user stats',
+      details: typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error)
+    });
+  }
 });
 
 // New: Get recent purchases (auctions won by user, with product info)
