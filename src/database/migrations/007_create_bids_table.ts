@@ -1,5 +1,7 @@
-exports.up = async function(knex) {
-  await knex.schema.createTable('bids', (table) => {
+import { Knex } from 'knex';
+
+export async function up(knex: Knex): Promise<void> {
+  await knex.schema.createTable('bids', (table: Knex.TableBuilder) => {
     table.increments('id').primary();
     table.integer('auction_id').unsigned().notNullable().references('id').inTable('auctions').onDelete('CASCADE');
     table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
@@ -8,8 +10,8 @@ exports.up = async function(knex) {
     table.index(['auction_id']);
     table.index(['user_id']);
   });
-};
+}
 
-exports.down = async function(knex) {
+export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists('bids');
-};
+}
