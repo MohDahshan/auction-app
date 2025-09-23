@@ -5,6 +5,12 @@ import { AuthRequest, authenticateToken, optionalAuth } from '../middleware/auth
 import { Auction, AuctionFilters, BidRequest, CreateAuctionRequest } from '../types';
 import { socketService } from '../server';
 
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const router = Router();
 
 // Validation rules
@@ -247,9 +253,9 @@ router.post('/', authenticateToken, createAuctionValidation, async (req: AuthReq
       end_time
     }: CreateAuctionRequest = req.body;
 
-    // Validate dates
-    const startDate = new Date(start_time);
-    const endDate = new Date(end_time);
+    // تحويل الوقت من توقيت الرياض إلى UTC قبل التخزين
+    const startDate = dayjs.tz(start_time, 'Asia/Riyadh').utc().toDate();
+    const endDate = dayjs.tz(end_time, 'Asia/Riyadh').utc().toDate();
     const now = new Date();
 
     if (startDate <= now) {
@@ -718,9 +724,9 @@ router.put('/:id', authenticateToken, createAuctionValidation, async (req: AuthR
       return;
     }
 
-    // Validate dates
-    const startDate = new Date(start_time);
-    const endDate = new Date(end_time);
+    // تحويل الوقت من توقيت الرياض إلى UTC قبل التخزين (تحديث المزاد)
+    const startDate = dayjs.tz(start_time, 'Asia/Riyadh').utc().toDate();
+    const endDate = dayjs.tz(end_time, 'Asia/Riyadh').utc().toDate();
     const now = new Date();
 
     if (startDate <= now) {
